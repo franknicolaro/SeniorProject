@@ -1,0 +1,78 @@
+[NEAT]
+#Setting up basic 
+fitness_criterion = max     #what we want from the generation
+fitness_threshold = 150     #what we determine is a fit enough Genome (singular entity) in the population
+pop_size = 25               #Population size
+reset_on_extinction = false #If a species of Genome becomes extinct, don't reset the algorithm
+
+[DefaultGenome]
+#Activation Function
+activation_default = tanh    #tanh includes a range from -1 to 1 to determine if a Genome should move
+activation_mutate_rate = 0.0 #rate at which the activation function changes randomly
+activation_options = tanh    #What the mutate rate selects from if it hits the rate specified
+
+#Aggregation Function (? Ask Danny)
+aggregation_default = sum    #collects the "sum product" of the weights and input neurons 
+aggregation_mutate_rate = 0.0
+aggregation_options = sum
+
+#Bias Options (How likely something is to change)
+bias_init_mean = 0
+bias_init_stdev = 1.0
+bias_min_value = -50.0          #for the bias, what is the max and min values we can pick
+bias_max_value = 50.0           # ^^^
+bias_mutate_power = 0.15        #How often the Genomes are meant to change and breed
+bias_mutate_rate = 0.75          # ^^^
+bias_replace_rate = 0.1
+
+#Genome Compatibility (What divides the generation into species, ask Danny about this too)
+compatibility_weight_coefficient = 0.35   #A coefficient concerning geonomic distance based on weight, bias, or response
+compatibility_disjoint_coefficient = 1.0 #A coefficient concerning geonomic distance based on disjoint and excess genes
+
+#Probabilities for adding a removing connections to existing nodes in the network
+conn_add_prob = 0.25
+conn_delete_prob = 0.25
+enabled_default = True          #enabling of active and inactive connections
+enabled_mutate_rate  = 0.01     #the rate at which connections are deactivated
+
+feed_forward = True             #All connections are not recurrent
+initial_connection = full
+
+#Node adding and deletion probabilities
+node_add_prob = 0.15
+node_delete_prob = 0.15
+
+#Parameters for network
+num_hidden = 0
+num_inputs = 6
+num_outputs = 2
+
+#Node response options (Ask Danny)
+response_init_mean = 0.0
+response_init_stdev = 1.0
+response_max_value = 50.0
+response_min_value = -50.0
+response_mutate_power = 0.0
+response_mutate_rate = 0.0
+response_replace_rate = 0.0
+
+#connect weight options (how the weights work, but ask Danny)
+weight_init_mean = 0.0
+weight_init_stdev = 1.0
+weight_max_value = 50.0
+weight_min_value = -50.0
+weight_mutate_power = 0.35
+weight_mutate_rate = 0.45
+weight_replace_rate = 0.1
+
+[DefaultSpeciesSet]
+compatibility_threshold = 2.5 #genomes under this threshold are considered the same species
+
+[DefaultStagnation]
+species_fitness_func = max
+max_stagnation = 40     #species that go beyond this threshold are considered stagnated and are removed
+species_elitism = 2     # number of species protected from stagnation
+
+[DefaultReproduction]
+elitism = 3                 #the number of most fit genomes will be part of the next generation
+survival_threshold = 0.2    #The chance of each species allowed to reproduce
