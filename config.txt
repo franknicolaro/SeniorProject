@@ -1,0 +1,78 @@
+[NEAT]
+#Setting up basic 
+fitness_criterion = max
+fitness_threshold = 5000
+pop_size = 30
+reset_on_extinction = false
+
+[DefaultGenome]
+#Activation Function
+activation_default = tanh
+activation_mutate_rate = 0.1
+activation_options = tanh
+
+#Aggregation Function (? Ask Danny)
+aggregation_default = sum
+aggregation_mutate_rate = 0.1
+aggregation_options = sum
+
+#Bias Options (How likely something is to change)
+bias_init_mean = 0
+bias_init_stdev = 1.0
+bias_min_value = -50.0
+bias_max_value = 50.0
+bias_mutate_power = 0.15
+bias_mutate_rate = 0.75
+bias_replace_rate = 0.1
+
+#Genome Compatibility (What divides the generation into species, ask Danny about this too)
+compatibility_weight_coefficient = 0.35
+compatibility_disjoint_coefficient = 1.0
+
+#Probabilities for adding a removing connections to existing nodes in the network
+conn_add_prob = 0.25
+conn_delete_prob = 0.25
+enabled_default = True
+enabled_mutate_rate  = 0.01
+
+feed_forward = True
+initial_connection = full
+
+#Node adding and deletion probabilities
+node_add_prob = 0.15
+node_delete_prob = 0.15
+
+#Parameters for network
+num_hidden = 0
+num_inputs = 4
+num_outputs = 3
+
+#Node response options (Ask Danny)
+response_init_mean = 0.0
+response_init_stdev = 1.0
+response_max_value = 50.0
+response_min_value = -50.0
+response_mutate_power = 0.15
+response_mutate_rate = 0.2
+response_replace_rate = 0.1
+
+#connect weight options (how the weights work, but ask Danny)
+weight_init_mean = 0.0
+weight_init_stdev = 1.0
+weight_max_value = 50.0
+weight_min_value = -50.0
+weight_mutate_power = 0.35
+weight_mutate_rate = 0.45
+weight_replace_rate = 0.1
+
+[DefaultSpeciesSet]
+compatibility_threshold = 2.5
+
+[DefaultStagnation]
+species_fitness_func = max
+max_stagnation = 5
+species_elitism = 2
+
+[DefaultReproduction]
+elitism = 6
+survival_threshold = 0.2
