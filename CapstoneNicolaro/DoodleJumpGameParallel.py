@@ -10,9 +10,11 @@ ALMOND = (239, 222, 205)        #Background Color
 BLACK = (0, 0, 0)               #Extra Color Option
 WIDTH = 600                     #Width of Window
 HEIGHT = 600                    #Height of Window
-SPEED_SCALAR = 10000000000      #Scalar for entity movement
+SPEED_SCALAR = 1                #Scalar for entity movement
 GEN = 0                         #Global to keep track of generation number
 background = ALMOND             #Set the background to Almond
+
+#TODO:incorporate separate version with parallel
 
 #Player class to keep track of player variables
 class Player(pygame.sprite.Sprite):
@@ -54,12 +56,13 @@ class Platform(pygame.sprite.Sprite):
 #The class to play the game of Doodle Jump, to be run by the AI
 class DoodleJump():
     
-    def __init__(self, genomes, config, gen):
+    def __init__(self, genomes, config, gen, setting):
         
         #Set each of the self.variables to the parameters passed through
         self.gen = gen
         self.genomes = genomes
         self.config = config
+        self.setting = setting
         
         #Initialize the font used
         self.font = pygame.font.Font("Bubblegum.ttf", 16)
@@ -75,6 +78,12 @@ class DoodleJump():
         #Initialize fps and timer to keep fps in check
         self.fps = 60
         self.timer = pygame.time.Clock()
+        
+        #Initialize other variables for keeping the game together
+        self.player_speed = 3.75                        #Horizontal player speed
+        self.score = 0                                  #Score variable for score label
+        self.game_end = False                           #Variable to keep track of if the game has ended
+        self.boing = pygame.mixer.Sound("Boing.ogg")    #Initalize sound for player jumps
 
         #Initalize the platforms and add the array to the platform group
         self.platforms = []
@@ -87,28 +96,68 @@ class DoodleJump():
             self.platforms.append(platform)
             x += 1
             
-        #Initialize all players, networks, and genomes of the generation
         self.players = []
         self.networks = []
         self.ge = []
-        for _, g in self.genomes:
-            #Create the network and append to self.networks
-            network = neat.nn.FeedForwardNetwork.create(g, self.config)
-            self.networks.append(network)
+        #Initialize all players, networks, and genomes of the generation
+        if self.setting == "PARALLEL":
+            for _, g in self.genomes:
+                #Create the network and append to self.networks
+                network = neat.nn.FeedForwardNetwork.create(g, self.config)
+                self.networks.append(network)
             
-            #Append a new player to the self.players list
-            self.players.append(Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png"))
+                #Append a new player to the self.players list
+                self.players.append(Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png"))
             
-            #Define the fitness for the genome and append to self.ge
-            g.fitness = 0
-            self.ge.append(g)
-            self.group.add(self.players[len(self.players) - 1])
+                #Define the fitness for the genome and append to self.ge
+                g.fitness = 0
+                self.ge.append(g)
+                self.group.add(self.players[len(self.players) - 1])
+            self.runGame()
+            pygame.quit()
+        elif self.setting == "SEPARATE":
+            #Separate Window Logic
+            for _, g in self.genomes:
+                #Create the network for each player in this loop
+                network = neat.nn.FeedForwardNetwork.create(g, config)
+                self.networks.append(network)
+                
+                #Initialize the player and append them to the players list and the player group
+                self.player = Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png")
+                self.players.append(self.player)
+                self.group.add(self.player)
+                
+                #define the fitness for the player and run the game after appending 
+                g.fitness = 0
+                self.ge.append(g)
+                self.runGame()
+                
+                #Clear the player from all lists the player was in and print their fitness before looping another time.
+                print("Fitness of Genome", g.fitness)
+                self.networks.clear()
+                self.ge.clear()
+                self.players.clear()
+                self.group.remove(self.player)
+                self.reset_game()
+            pygame.quit()
             
-        #Other Variables for keeping the game together
-        self.player_speed = 3.1                         #Horizontal player speed
-        self.score = 0                                  #Score variable for score label
+    #Re-initialize everytihg necessary to re-run the game
+    def reset_game(self):
+        self.platform_group.remove(self.platforms)
+        self.score = 0
         self.game_end = False                           #Variable to keep track of if the game has ended
         self.boing = pygame.mixer.Sound("Boing.ogg")    #Initalize sound for player jumps
+
+        #Initalize the platforms and add the array to the platform group
+        self.platforms = []
+        self.platform_group.add(self.platforms)
+        gap = 180           #Gap variable to ensure platforms are a fair enough distance away
+        x = 0               #x variable for the following for loop
+        for platform in range(5):
+            platform = Platform(80, 20, (random.randint(0, 495)), 450 - (gap * x), "Platform.png")
+            self.platform_group.add(platform)
+            self.platforms.append(platform)
+            x += 1
 
     #Helper method to update all players and if they should jump
     def update_players(self):
@@ -141,8 +190,7 @@ class DoodleJump():
         for x, player in enumerate(self.players):
             for i in range(len(self.platforms)):
                 #Hard coded collision (Pygame collision works the same)
-                if(player.rect.y + 60 >= self.platforms[i].rect.y and player.rect.y + 60 <= self.platforms[i].rect.y + 20):
-                    if(player.rect.x >= self.platforms[i].rect.x - 50 and player.rect.x <= self.platforms[i].rect.x + 75
+                if(pygame.Rect.colliderect(player.player_rect, self.platforms[i].rect)
                         and player.jump == False and player.change_y > 0):
                         
                             #Set the jump variable to true and play the jump Sound
@@ -278,15 +326,11 @@ class DoodleJump():
                     player.image = pygame.transform.flip(player.image, 0, 0)
                 elif(player.change_x < 0):
                     player.image = pygame.transform.flip(player.image, 1, 0)
-                    
-            #Call the collision check
-            self.check_collisions_all_players()
-            
-            #Wrap around feature: If the player moves beyond the bounds of the screen
-            #(Either to the left or the right) then move the player to the other side of the screen. 
-            for x, player in enumerate(self.players):
+                
+                #Wrap around feature: If the player moves beyond the bounds of the screen
+                #(Either to the left or the right) then move the player to the other side of the screen. 
                 player.rect.x += player.change_x
-                player.player_rect.x = player.rect.x
+                player.player_rect.x += player.change_x
                 if(player.rect.x > 600):
                     player.rect.x = -50
                     player.player_rect.x  = -50
@@ -294,6 +338,9 @@ class DoodleJump():
                     player.rect.x = 600
                     player.player_rect.x = 600
                     
+            #Call the collision check
+            self.check_collisions_all_players()
+                 
             #Call the helper method to update the players
             self.update_players()
         
@@ -304,19 +351,24 @@ class DoodleJump():
             #Draw all groups to the window
             self.group.draw(self.screen)
             self.platform_group.draw(self.screen)
+            
             pygame.display.flip()
             
             #If all players are gone or the score meets the necessary variable, then stop running the loop and quit Pygame
             if(len(self.players) == 0 or self.score > 50000):
                running = False
-        
-        pygame.quit()
-        
+       
+       
+class MainWrapper():
+    def __init__(self):
+        self.gen = 0
+    def main(self, genomes, config):
+        AI_SETTING = "SEPARATE"   #settings are "PARALLEL" for parallel, "SEPARATE" for single player participation.
+        self.gen += 1
+        pygame.init()
+        doodle_jump = DoodleJump(genomes, config, self.gen, AI_SETTING)
 #Main method to run each generation iteration
 def main(genomes, config):
-    #Initialize global generation variable and increment
-    global GEN
-    GEN += 1
     pygame.init()
     doodle_jump = DoodleJump(genomes, config, GEN)
     doodle_jump.runGame()
@@ -346,7 +398,8 @@ def run_config(config_path):
     
     #run the population
     #pygame.mixer.music.load()
-    most_fit = population.run(main, 1000)
+    mw = MainWrapper()
+    most_fit = population.run(mw.main, 1000)
     
     print("most fit is: ", most_fit)
     pass
