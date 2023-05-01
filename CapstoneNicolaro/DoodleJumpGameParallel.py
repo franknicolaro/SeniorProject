@@ -123,7 +123,7 @@ class DoodleJump():
                 self.networks.append(network)
                 
                 #Initialize the player and append them to the players list and the player group
-                self.player = Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png")
+                self.player = Player(50, 60, self.platforms[0].rect.x, self.platforms[0].rect.y - 90, "PlayerSprite.png")
                 self.players.append(self.player)
                 self.group.add(self.player)
                 
