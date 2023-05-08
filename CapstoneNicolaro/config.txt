@@ -1,7 +1,7 @@
 [NEAT]
 #Setting up basic 
 fitness_criterion = max
-fitness_threshold = 50000
+fitness_threshold = 20000
 pop_size = 30
 reset_on_extinction = false
 
@@ -44,8 +44,8 @@ node_delete_prob = 0.15
 
 #Parameters for network
 num_hidden = 0
-num_inputs = 4
-num_outputs = 3
+num_inputs = 2
+num_outputs = 1
 
 #Node response options (Ask Danny)
 response_init_mean = 0.0
