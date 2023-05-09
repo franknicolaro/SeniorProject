@@ -10,9 +10,11 @@ ALMOND = (239, 222, 205)        #Background Color
 BLACK = (0, 0, 0)               #Extra Color Option
 WIDTH = 600                     #Width of Window
 HEIGHT = 600                    #Height of Window
-SPEED_SCALAR = 10000000000      #Scalar for entity movement
+SPEED_SCALAR = 1000000000000000 #Scalar for entity movement
 GEN = 0                         #Global to keep track of generation number
 background = ALMOND             #Set the background to Almond
+
+#TODO:incorporate separate version with parallel
 
 #Player class to keep track of player variables
 class Player(pygame.sprite.Sprite):
@@ -54,12 +56,16 @@ class Platform(pygame.sprite.Sprite):
 #The class to play the game of Doodle Jump, to be run by the AI
 class DoodleJump():
     
-    def __init__(self, genomes, config, gen):
+    def __init__(self, genomes, config, gen, setting, inputs, outputs, dist_det):
         
         #Set each of the self.variables to the parameters passed through
         self.gen = gen
         self.genomes = genomes
         self.config = config
+        self.setting = setting
+        self.inputs = inputs
+        self.outputs = outputs
+        self.dist_det = dist_det
         
         #Initialize the font used
         self.font = pygame.font.Font("Bubblegum.ttf", 16)
@@ -75,6 +81,12 @@ class DoodleJump():
         #Initialize fps and timer to keep fps in check
         self.fps = 60
         self.timer = pygame.time.Clock()
+        
+        #Initialize other variables for keeping the game together
+        self.player_speed = 3.75                        #Horizontal player speed
+        self.score = 0                                  #Score variable for score label
+        self.game_end = False                           #Variable to keep track of if the game has ended
+        self.boing = pygame.mixer.Sound("Boing.ogg")    #Initalize sound for player jumps
 
         #Initalize the platforms and add the array to the platform group
         self.platforms = []
@@ -87,28 +99,68 @@ class DoodleJump():
             self.platforms.append(platform)
             x += 1
             
-        #Initialize all players, networks, and genomes of the generation
         self.players = []
         self.networks = []
         self.ge = []
-        for _, g in self.genomes:
-            #Create the network and append to self.networks
-            network = neat.nn.FeedForwardNetwork.create(g, self.config)
-            self.networks.append(network)
+        #Initialize all players, networks, and genomes of the generation
+        if self.setting == "PARALLEL":
+            for _, g in self.genomes:
+                #Create the network and append to self.networks
+                network = neat.nn.FeedForwardNetwork.create(g, self.config)
+                self.networks.append(network)
             
-            #Append a new player to the self.players list
-            self.players.append(Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png"))
+                #Append a new player to the self.players list
+                self.players.append(Player(50, 60, self.platforms[0].rect.x, 370, "PlayerSprite.png"))
             
-            #Define the fitness for the genome and append to self.ge
-            g.fitness = 0
-            self.ge.append(g)
-            self.group.add(self.players[len(self.players) - 1])
+                #Define the fitness for the genome and append to self.ge
+                g.fitness = 0
+                self.ge.append(g)
+                self.group.add(self.players[len(self.players) - 1])
+            self.runGame()
+            pygame.quit()
+        elif self.setting == "SEPARATE":
+            #Separate Window Logic
+            for _, g in self.genomes:
+                #Create the network for each player in this loop
+                network = neat.nn.FeedForwardNetwork.create(g, config)
+                self.networks.append(network)
+                
+                #Initialize the player and append them to the players list and the player group
+                self.player = Player(50, 60, self.platforms[0].rect.x, self.platforms[0].rect.y - 90, "PlayerSprite.png")
+                self.players.append(self.player)
+                self.group.add(self.player)
+                
+                #define the fitness for the player and run the game after appending 
+                g.fitness = 0
+                self.ge.append(g)
+                self.runGame()
+                
+                #Clear the player from all lists the player was in and print their fitness before looping another time.
+                print("Fitness of Genome", g.fitness)
+                self.networks.clear()
+                self.ge.clear()
+                self.players.clear()
+                self.group.remove(self.player)
+                self.reset_game()
+            pygame.quit()
             
-        #Other Variables for keeping the game together
-        self.player_speed = 3.1                         #Horizontal player speed
-        self.score = 0                                  #Score variable for score label
+    #Re-initialize everytihg necessary to re-run the game
+    def reset_game(self):
+        self.platform_group.remove(self.platforms)
+        self.score = 0
         self.game_end = False                           #Variable to keep track of if the game has ended
         self.boing = pygame.mixer.Sound("Boing.ogg")    #Initalize sound for player jumps
+
+        #Initalize the platforms and add the array to the platform group
+        self.platforms = []
+        self.platform_group.add(self.platforms)
+        gap = 180           #Gap variable to ensure platforms are a fair enough distance away
+        x = 0               #x variable for the following for loop
+        for platform in range(5):
+            platform = Platform(80, 20, (random.randint(0, 495)), 450 - (gap * x), "Platform.png")
+            self.platform_group.add(platform)
+            self.platforms.append(platform)
+            x += 1
 
     #Helper method to update all players and if they should jump
     def update_players(self):
@@ -141,8 +193,7 @@ class DoodleJump():
         for x, player in enumerate(self.players):
             for i in range(len(self.platforms)):
                 #Hard coded collision (Pygame collision works the same)
-                if(player.rect.y + 60 >= self.platforms[i].rect.y and player.rect.y + 60 <= self.platforms[i].rect.y + 20):
-                    if(player.rect.x >= self.platforms[i].rect.x - 50 and player.rect.x <= self.platforms[i].rect.x + 75
+                if(pygame.Rect.colliderect(player.player_rect, self.platforms[i].rect)
                         and player.jump == False and player.change_y > 0):
                         
                             #Set the jump variable to true and play the jump Sound
@@ -213,6 +264,58 @@ class DoodleJump():
             if(player.rect.y == y):
                 result = x
         return result
+    
+    #One of several helper methods to determine the output of a given player network. 
+    #This is for 2 inputs and the measurement of distances are done via left/right measurements.
+    def get_output_left_right(self, player, x):
+        output = ()
+        if(player.lastPlatformIndex == 4):
+            if((player.rect.x - self.platforms[0].rect.x) < 0):
+                dist_right = max((player.rect.x - self.platforms[0].rect.x), 
+                                -((650 - player.rect.x) + (self.platforms[0].rect.x)))
+                dist_left = ((player.rect.x) + (650 - self.platforms[0].rect.x))
+            else:
+                dist_right = -((650 - player.rect.x) + (self.platforms[0].rect.x))
+                dist_left = min((player.rect.x) + (650 - self.platforms[0].rect.x), 
+                                (player.rect.x - self.platforms[0].rect.x))
+        else:
+            if((player.rect.x - self.platforms[player.lastPlatformIndex + 1].rect.x) < 0):
+                dist_right = max((player.rect.x - self.platforms[player.lastPlatformIndex + 1].rect.x), 
+                                 -((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x)))
+                dist_left = ((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x))
+            else:
+                dist_right = -((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x))
+                dist_left = min((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x), 
+                                (player.rect.x - self.platforms[player.lastPlatformIndex + 1].rect.x))
+        if(self.inputs == "2"):
+            output = self.networks[x].activate((dist_left, dist_right))
+        elif(self.inputs == "4"):
+            output = self.networks[x].activate((player.rect.x, player.rect.y, dist_left, dist_right))
+        return output
+    #One of several helper methods to determine the output of a given player network. 
+    #This is for 2 inputs and the measurement of distances are done via distance and
+    #distance via wrap-around measurements.
+    def get_output_dist_wrap(self, player, x):
+        output = ()
+        if(player.lastPlatformIndex == 4):
+            dist = (player.rect.x - self.platforms[0].rect.x)
+            dist_wrap = min(((player.rect.x) + (650 - self.platforms[0].rect.x)),
+                            ((650 - player.rect.x) + (self.platforms[0].rect.x)))
+            if(((player.rect.x) + (650 - self.platforms[0].rect.x)) > 
+                ((650 - player.rect.x) + (self.platforms[0].rect.x))):
+                dist_wrap = -(dist_wrap)
+        else:
+            dist = (player.rect.x - self.platforms[player.lastPlatformIndex + 1].rect.x)
+            dist_wrap = min(((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x)),
+                            ((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x)))
+            if(((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x)) > 
+                ((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x))):
+                dist_wrap = -(dist_wrap)
+        if(self.inputs == "2"):
+            output = self.networks[x].activate((dist, dist_wrap))
+        elif(self.inputs == "4"):
+            output = self.networks[x].activate((player.rect.x, player.rect.y, dist, dist_wrap))
+        return output
 
     #TODO: fix varibale names
     #Main game loop to utilize all helper methods and to calculate all needed variables for all players
@@ -230,6 +333,7 @@ class DoodleJump():
             gen_label = self.font.render('Gen: ' + str(self.gen), True, BLACK, background)
             self.screen.blit(gen_label, (0, 20))
     
+            #TODO:Condense this down
             #Function for each player to activate their network and provide output to them. 
             for x, player in enumerate(self.players):
                 
@@ -245,48 +349,38 @@ class DoodleJump():
                 #
                 # Positive: the player should move to the left.
                 # Negative: the player should move to the right.
-                if(player.lastPlatformIndex == 4):
-                    dist = (player.rect.x - self.platforms[0].rect.x)
-                    #TODO: Signs of dist_wrap
-                    dist_wrap = min(((player.rect.x) + (650 - self.platforms[0].rect.x)),
-                                    ((650 - player.rect.x) + (self.platforms[0].rect.x)))
-                    if(((player.rect.x) + (650 - self.platforms[0].rect.x)) > 
-                       ((650 - player.rect.x) + (self.platforms[0].rect.x))):
-                        dist_wrap = -(dist_wrap)
-                else:
-                    dist = (player.rect.x - self.platforms[player.lastPlatformIndex + 1].rect.x)
-                    dist_wrap = min(((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x)),
-                                    ((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x)))
-                    if(((player.rect.x) + (650 - self.platforms[player.lastPlatformIndex + 1].rect.x)) > 
-                        ((650 - player.rect.x) + (self.platforms[player.lastPlatformIndex + 1].rect.x))):
-                        dist_wrap = -(dist_wrap)
+                
             
                 #TODO: possible vector addition for distance variables (nearest platform, not next platform)
-                #Activate the network using the player's coordinates and the distance variables
-                output = self.networks[x].activate((player.rect.x, player.rect.y, dist, dist_wrap))
-            
-                #based on the output from the network activation, move the player in the direction specified
-                if((max(output[0], output[1], output[2]) == output[0]) and player.firstCollision):
-                    player.change_x = -self.player_speed #* SPEED_SCALAR
-                elif((max(output[0], output[1], output[2]) == output[1]) and player.firstCollision):
-                    player.change_x = self.player_speed #* SPEED_SCALAR
-                else:
-                    player.change_x = 0
+                #Obtain output depending on the given settings
+                if(self.dist_det == "LEFT/RIGHT"):
+                    output = self.get_output_left_right(player, x)
+                elif(self.dist_det == "DIST/WRAP"):
+                    output = self.get_output_dist_wrap(player, x)
+
+                
+                #based on the number of outputs from the network activation
+                #and the strength of each output, move the player in the direction specified
+                if(self.outputs == "3"):
+                    if((max(output[0], output[1], output[2]) == output[0]) and player.firstCollision):
+                        player.change_x = -self.player_speed
+                    elif((max(output[0], output[1], output[2]) == output[1]) and player.firstCollision):
+                        player.change_x = self.player_speed
+                    else:
+                        player.change_x = 0
+                elif(self.outputs == "1"):
+                    player.change_x = self.player_speed * output[0]
                     
                 #Flip the image of the player depending on the player's change_x variable
                 if(player.change_x > 0):
                     player.image = pygame.transform.flip(player.image, 0, 0)
                 elif(player.change_x < 0):
                     player.image = pygame.transform.flip(player.image, 1, 0)
-                    
-            #Call the collision check
-            self.check_collisions_all_players()
-            
-            #Wrap around feature: If the player moves beyond the bounds of the screen
-            #(Either to the left or the right) then move the player to the other side of the screen. 
-            for x, player in enumerate(self.players):
+                
+                #Wrap around feature: If the player moves beyond the bounds of the screen
+                #(Either to the left or the right) then move the player to the other side of the screen. 
                 player.rect.x += player.change_x
-                player.player_rect.x = player.rect.x
+                player.player_rect.x += player.change_x
                 if(player.rect.x > 600):
                     player.rect.x = -50
                     player.player_rect.x  = -50
@@ -294,6 +388,9 @@ class DoodleJump():
                     player.rect.x = 600
                     player.player_rect.x = 600
                     
+            #Call the collision check
+            self.check_collisions_all_players()
+                 
             #Call the helper method to update the players
             self.update_players()
         
@@ -304,19 +401,31 @@ class DoodleJump():
             #Draw all groups to the window
             self.group.draw(self.screen)
             self.platform_group.draw(self.screen)
+            
             pygame.display.flip()
             
             #If all players are gone or the score meets the necessary variable, then stop running the loop and quit Pygame
-            if(len(self.players) == 0 or self.score > 50000):
+            if(len(self.players) == 0 or self.score > 20000):
                running = False
+       
+       
+class MainWrapper():
+    def __init__(self):
+        self.gen = 0
+    def main(self, genomes, config):
+        AI_SETTING = "SEPARATE"             #settings are "PARALLEL" for parallel, "SEPARATE" for single player participation.
         
-        pygame.quit()
-        
+        #Note: The INPUTS, OUTPUTS, and DIST_DETERMINANT variables must be correct or the program will not run.
+        #Furthermore, the INPUTS and OUTPUTS variables must match what is represented in the configuration file.
+        INPUTS = "2"                        #settings are "4" or "2", depending on what number is specified in the configuration file
+        OUTPUTS = "1"                       #settings are "3" or "1", depending on what number is specified in the configuration file
+        DIST_DETERMINANT = "DIST/WRAP"      #settings are "DIST/WRAP" for distances to be measured by distance to the platform, 
+                                            #or "LEFT/RIGHT" for distances to be measured by distance to the left and distance to the right. 
+        self.gen += 1
+        pygame.init()
+        doodle_jump = DoodleJump(genomes, config, self.gen, AI_SETTING, INPUTS, OUTPUTS, DIST_DETERMINANT)
 #Main method to run each generation iteration
 def main(genomes, config):
-    #Initialize global generation variable and increment
-    global GEN
-    GEN += 1
     pygame.init()
     doodle_jump = DoodleJump(genomes, config, GEN)
     doodle_jump.runGame()
@@ -346,7 +455,8 @@ def run_config(config_path):
     
     #run the population
     #pygame.mixer.music.load()
-    most_fit = population.run(main, 1000)
+    mw = MainWrapper()
+    most_fit = population.run(mw.main, 1000)
     
     print("most fit is: ", most_fit)
     pass
