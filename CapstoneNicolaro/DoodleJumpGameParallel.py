@@ -3,6 +3,8 @@ import random
 import neat
 import os
 import math
+import pickle
+import argparse
 
 
 #Constants
@@ -267,6 +269,12 @@ class DoodleJump():
     
     #One of several helper methods to determine the output of a given player network. 
     #This is for 2 inputs and the measurement of distances are done via left/right measurements.
+    #Note:
+    # The sign of the variable determines the direction in which the player moves.
+    # The signs are as follows:
+    #
+    # Positive: the player should move to the left.
+    # Negative: the player should move to the right.
     def get_output_left_right(self, player, x):
         output = ()
         if(player.lastPlatformIndex == 4):
@@ -295,6 +303,12 @@ class DoodleJump():
     #One of several helper methods to determine the output of a given player network. 
     #This is for 2 inputs and the measurement of distances are done via distance and
     #distance via wrap-around measurements.
+    #Note:
+    # The sign of the variable determines the direction in which the player moves.
+    # The signs are as follows:
+    #
+    # Positive: the player should move to the left.
+    # Negative: the player should move to the right.
     def get_output_dist_wrap(self, player, x):
         output = ()
         if(player.lastPlatformIndex == 4):
@@ -333,32 +347,11 @@ class DoodleJump():
             gen_label = self.font.render('Gen: ' + str(self.gen), True, BLACK, background)
             self.screen.blit(gen_label, (0, 20))
     
-            #TODO:Condense this down
             #Function for each player to activate their network and provide output to them. 
             for x, player in enumerate(self.players):
-                
-                #Check for the last platform and to calculate distance from themselves to next platform
-                #Variable names:
-                #
-                #dist: the distance from the player to the platform normally
-                #dist_wrap: the MINIMUM distance from the player to the platform with the wrap around feature
-                #
-                #Other Notes:
-                # The sign of the variable determines the direction in which the player moves.
-                # The signs are as follows:
-                #
-                # Positive: the player should move to the left.
-                # Negative: the player should move to the right.
-                
-            
-                #TODO: possible vector addition for distance variables (nearest platform, not next platform)
-                #Obtain output depending on the given settings
-                if(self.dist_det == "LEFT/RIGHT"):
-                    output = self.get_output_left_right(player, x)
-                elif(self.dist_det == "DIST/WRAP"):
-                    output = self.get_output_dist_wrap(player, x)
+                #Obtain output depending on the given setting.
+                output = self.dist_det(self, player, x)
 
-                
                 #based on the number of outputs from the network activation
                 #and the strength of each output, move the player in the direction specified
                 if(self.outputs == "3"):
@@ -408,7 +401,7 @@ class DoodleJump():
             if(len(self.players) == 0 or self.score > 20000):
                running = False
        
-       
+#Helper class to run the game with settings passed through. 
 class MainWrapper():
     def __init__(self):
         self.gen = 0
@@ -419,23 +412,11 @@ class MainWrapper():
         #Furthermore, the INPUTS and OUTPUTS variables must match what is represented in the configuration file.
         INPUTS = "2"                        #settings are "4" or "2", depending on what number is specified in the configuration file
         OUTPUTS = "1"                       #settings are "3" or "1", depending on what number is specified in the configuration file
-        DIST_DETERMINANT = "DIST/WRAP"      #settings are "DIST/WRAP" for distances to be measured by distance to the platform, 
-                                            #or "LEFT/RIGHT" for distances to be measured by distance to the left and distance to the right. 
+        DIST_DETERMINANT = DoodleJump.get_output_dist_wrap      #Changing the method to one of the two get_output_***** methods results
+                                                                #in a change in how distance is determined. 
         self.gen += 1
         pygame.init()
         doodle_jump = DoodleJump(genomes, config, self.gen, AI_SETTING, INPUTS, OUTPUTS, DIST_DETERMINANT)
-#Main method to run each generation iteration
-def main(genomes, config):
-    pygame.init()
-    doodle_jump = DoodleJump(genomes, config, GEN)
-    doodle_jump.runGame()
-
-def play_gen(genomes, config):
-    for _, g in genomes:
-        network = neat.nn.FeedForwardNetwork.create(g, config)
-        g.fitness = 0
-        main(g, network)
-        print("Fitness of Genome", g.fitness)
 
 #Method to run the configuration file and start the AI learning process
 def run_config(config_path):
@@ -453,17 +434,39 @@ def run_config(config_path):
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
     
-    #run the population
-    #pygame.mixer.music.load()
+    #Run the population by declaring the MainWrapper.
     mw = MainWrapper()
     most_fit = population.run(mw.main, 1000)
     
-    print("most fit is: ", most_fit)
+    #Ouptut the most_fit genome and save that genome using a pickle. 
+    print("Most fit is: " + str(most_fit))
+    with open("most_fit_genome.pkl", "wb") as f:
+        pickle.dump(most_fit, f)
+        f.close()
     pass
 
 #initialize the config file needed and run NEAT.
 if __name__ == "__main__":
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, "config.txt")
-    run_config(config_path)
+    #Declare ArgumentParser and add "filename" as an argument.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename')
+    args = parser.parse_args()
+    
+    #Load the path of SeniorProject for reference and join that to config_path
+    local_dir = os.path.dirname("SeniorProject")
+    config_path = os.path.join(local_dir, "CapstoneNicolaro/config.txt")
+    
+    #If the file provided is the most fit genome of a previous execution of the program,
+    #run only that genome in the game. 
+    if(args.filename == "most_fit_genome.pkl"):
+        config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, 
+                                        neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
+        with open((args.filename), "rb") as file:
+            prev_most_fit = pickle.load(file)
+        print("Loading Genome with " + str(prev_most_fit))
+        genomes = [(1, prev_most_fit)]
+        mw = MainWrapper()
+        mw.main(genomes, config)
+    else:
+        run_config(config_path)
     
