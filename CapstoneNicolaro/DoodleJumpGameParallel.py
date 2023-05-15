@@ -1,8 +1,13 @@
+#This is the main file which runs the program.
+#Author's Note: A large portion of the code was a result of following
+#along with Youtube user "LeMaster Tech"'s video of how to create Doodle Jump
+#in Pygame. For that reason, credit for the creation of those portions of the program
+#go to them. 
+
 import pygame
 import random
 import neat
 import os
-import math
 import pickle
 import argparse
 
@@ -227,7 +232,7 @@ class DoodleJump():
             for i in range(len(plat_list)):
                 #decrement the y variable by a constant delta
                 plat_list[i].rect.y -= delta
-            #Add to the score by the pixel
+            #Add to the score by each pixel the platforms move downwards
             self.score += 1
             for x, player in enumerate(self.players):
                 #Add 1 to each player's fitness and keep their y variable in check
@@ -300,6 +305,7 @@ class DoodleJump():
         elif(self.inputs == "4"):
             output = self.networks[x].activate((player.rect.x, player.rect.y, dist_left, dist_right))
         return output
+    
     #One of several helper methods to determine the output of a given player network. 
     #This is for 2 inputs and the measurement of distances are done via distance and
     #distance via wrap-around measurements.
@@ -331,7 +337,6 @@ class DoodleJump():
             output = self.networks[x].activate((player.rect.x, player.rect.y, dist, dist_wrap))
         return output
 
-    #TODO: fix varibale names
     #Main game loop to utilize all helper methods and to calculate all needed variables for all players
     def runGame(self):
         #initalize a running boolean to keep track of in the game loop
@@ -452,18 +457,21 @@ if __name__ == "__main__":
     parser.add_argument('filename')
     args = parser.parse_args()
     
-    #Load the path of SeniorProject for reference and join that to config_path
+    #Load the path of SeniorProject as the local directory and join that to config_path
     local_dir = os.path.dirname("SeniorProject")
     config_path = os.path.join(local_dir, "CapstoneNicolaro/config.txt")
     
     #If the file provided is the most fit genome of a previous execution of the program,
-    #run only that genome in the game. 
+    #run only that genome in the game. Otherwise, run the original execution of the program.
     if(args.filename == "most_fit_genome.pkl"):
         config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, 
                                         neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
         with open((args.filename), "rb") as file:
             prev_most_fit = pickle.load(file)
         print("Loading Genome with " + str(prev_most_fit))
+        
+        #Create a single element array of the previous most fit genome and pass that through as the genomes
+        #into the main method of the MainWrapper class with the configuration file declared.
         genomes = [(1, prev_most_fit)]
         mw = MainWrapper()
         mw.main(genomes, config)

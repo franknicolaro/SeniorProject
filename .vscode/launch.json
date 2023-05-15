@@ -2,6 +2,7 @@
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    //AUTHOR'S NOTE: This file is entirely optional, it only gives a means to run the file through VSCode.
     "version": "0.2.0",
     "configurations": [
         {
