@@ -21,8 +21,6 @@ SPEED_SCALAR = 1000000000000000 #Scalar for entity movement
 GEN = 0                         #Global to keep track of generation number
 background = ALMOND             #Set the background to Almond
 
-#TODO:incorporate separate version with parallel
-
 #Player class to keep track of player variables
 class Player(pygame.sprite.Sprite):
     def __init__(self, width, height, x, y, file_name):
