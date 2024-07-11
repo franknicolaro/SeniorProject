@@ -1,8 +1,6 @@
 #This is the main file which runs the program.
-#Author's Note: A large portion of the code was a result of following
-#along with Youtube user "LeMaster Tech"'s video of how to create Doodle Jump
-#in Pygame. For that reason, credit for the creation of those portions of the program
-#go to them. 
+#Choose settings below with SPEED_SCALAR, AI_SETTING, INPUTS, and OUTPUTS, 
+#then run the program to see the AI learn. 
 
 import pygame
 import random
